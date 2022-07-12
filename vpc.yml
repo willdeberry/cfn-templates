@@ -158,6 +158,32 @@ Resources:
           Value: WebSG
       VpcId: !Ref VPC
 
+  MinecraftSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow minecraft traffic
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          FromPort: 25565
+          IpProtocol: tcp
+          ToPort: 25565
+        - CidrIp: 0.0.0.0/0
+          FromPort: 25566
+          IpProtocol: tcp
+          ToPort: 25566
+        - CidrIp: 0.0.0.0/0
+          FromPort: 25575
+          IpProtocol: tcp
+          ToPort: 25575
+        - CidrIp: 0.0.0.0/0
+          FromPort: 25576
+          IpProtocol: tcp
+          ToPort: 25576
+      Tags:
+        - Key: Name
+          Value: MinecraftSG
+      VpcId: !Ref VPC
+
 Outputs:
   VPC:
     Description: VPC Id
@@ -182,6 +208,12 @@ Outputs:
     Value: !Ref WebSG
     Export:
       Name: main-websg
+
+  MinecraftSG:
+    Description: Minecraft security group
+    Value: !Ref MinecraftSG
+    Export:
+      Name: main-minecraftsg
 
   NACL:
     Description: Network ACL for all subnets
