@@ -40,6 +40,12 @@ Resources:
       RouteTableId: !Ref RouteTable
       SubnetId: !Ref Subnet
 
+  SubnetToNACL:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !ImportValue main-nacl
+      SubnetId: !Ref Subnet
+
   EIP:
     Type: AWS::EC2::EIP
     Properties:
