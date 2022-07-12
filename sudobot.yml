@@ -87,7 +87,7 @@ Resources:
           Ebs:
             DeleteOnTermination: true
             Encrypted: false
-            VolumeSize: 20
+            VolumeSize: 8
             VolumeType: gp2
       ImageId: !Ref UbuntuArmAMI
       InstanceType: t4g.nano
