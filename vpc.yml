@@ -1,0 +1,85 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Template for basic EC2 setup
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/24
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: main
+
+  IGW:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: main-igw
+
+  VPCtoIGW:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref IGW
+      VpcId: !Ref VPC
+
+  SSHSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow SSH Traffic
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+      Tags:
+        - Key: Name
+          Value: SSHSG
+      VpcId: !Ref VPC
+
+  WebSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow web traffic
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+        - CidrIp: 0.0.0.0/0
+          FromPort: 443
+          IpProtocol: tcp
+          ToPort: 443
+      Tags:
+        - Key: Name
+          Value: WebSG
+      VpcId: !Ref VPC
+
+Outputs:
+  VPC:
+    Description: VPC Id
+    Value: !Ref VPC
+    Export:
+      Name: main-vpc-id
+
+  IGW:
+    Description: Main IGW for internet access
+    Value: !Ref IGW
+    Export:
+      Name: main-igw
+
+  SSHSG:
+    Description: SSH security group
+    Value: !Ref SSHSG
+    Export:
+      Name: main-sshsg
+
+  WebSG:
+    Description: Web security group
+    Value: !Ref WebSG
+    Export:
+      Name: main-websg

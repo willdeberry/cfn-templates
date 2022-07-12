@@ -1,0 +1,115 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Template for standing up SudoBot
+
+Parameters:
+  UbuntuArmAMI:
+    Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+    Default: /aws/service/canonical/ubuntu/server-minimal/20.04/stable/current/arm64/hvm/ebs-gp2/ami-id
+
+Resources:
+  Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: us-east-1c
+      CidrBlock: 10.0.0.0/25
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: SudoBot
+      VpcId: !ImportValue main-vpc-id
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: sudobot-routeTable
+      VpcId: !ImportValue main-vpc-id
+
+  Route:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !ImportValue main-igw
+      RouteTableId: !Ref RouteTable
+
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref Subnet
+
+  EIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      InstanceId: !Ref EC2
+      Tags:
+        - Key: Name
+          Value: sudobot-eip
+
+  EC2:
+    Type: AWS::EC2::Instance
+    Metadata:
+      AWS::CloudFormation::Init:
+        configSets:
+          all:
+            - setup
+            - config
+            - cleanup
+        setup:
+          commands:
+            createUser:
+              command: useradd --shell /bin/bash --home-dir /home/will will
+            updateGroups:
+              command: usermod -a -G docker,plugdev,sudo will
+        config:
+          files:
+            /etc/sudoers.d/will:
+              content: '%will ALL=(ALL:ALL) NOPASSWD: ALL'
+              mode: 440
+              owner: root
+              group: root
+            /home/will/.ssh/authorized_keys:
+              content: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIANk7ASLutRd1SH/+INoodEm1l07Baj16cQBYtajr6p1'
+              mode: 600
+              owner: will
+              group: will
+        cleanup:
+          commands:
+            fixPerms:
+              command: 'chown -R will.will /home/will'
+    Properties:
+      AvailabilityZone: !GetAtt Subnet.AvailabilityZone
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            DeleteOnTermination: true
+            Encrypted: false
+            VolumeSize: 20
+            VolumeType: gp2
+      ImageId: !Ref UbuntuArmAMI
+      InstanceType: t4g.nano
+      KeyName: ssh-ed25519
+      SecurityGroupIds:
+        - !ImportValue main-sshsg
+        - !ImportValue main-websg
+      SubnetId: !Ref Subnet
+      Tags:
+        - Key: Name
+          Value: SudoBot
+      Tenancy: default
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+
+          apt update
+          apt install -y --no-install-recommends git docker-compose docker.io python3-pip bash-completion ufw
+          python3 -m pip install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
+          /usr/local/bin/cfn-init -v --stack ${AWS::StackName} --resource EC2 --configsets all --region ${AWS::Region}
+
+Outputs:
+  EC2PublicIp:
+    Description: Public IP of the SudoBot instance
+    Value: !GetAtt EC2.PublicIp
