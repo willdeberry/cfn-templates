@@ -46,14 +46,11 @@ Resources:
       NetworkAclId: !ImportValue main-nacl
       SubnetId: !Ref Subnet
 
-  EIP:
-    Type: AWS::EC2::EIP
+  EIPAssociation:
+    Type: AWS::EC2::EIPAssociation
     Properties:
-      Domain: vpc
+      AllocationId: !ImportValue sudobot-eip-allocationid
       InstanceId: !Ref EC2
-      Tags:
-        - Key: Name
-          Value: sudobot-eip
 
   EC2:
     Type: AWS::EC2::Instance
@@ -118,8 +115,3 @@ Resources:
           python3 -m pip install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
           /usr/local/bin/cfn-init -v --stack ${AWS::StackName} --resource EC2 --configsets all --region ${AWS::Region}
           /usr/local/bin/cfn-signal --exit-code $? --stack ${AWS::StackName} --resource EC2 --region ${AWS::Region}
-
-Outputs:
-  EC2PublicIp:
-    Description: Public IP of the SudoBot instance
-    Value: !GetAtt EC2.PublicIp
