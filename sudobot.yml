@@ -111,7 +111,7 @@ Resources:
           #!/bin/bash
 
           apt update
-          apt install -y --no-install-recommends git docker-compose docker.io python3-pip bash-completion ufw
+          apt install -y --no-install-recommends python3-pip docker-compose docker.io
           python3 -m pip install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
           /usr/local/bin/cfn-init -v --stack ${AWS::StackName} --resource EC2 --configsets all --region ${AWS::Region}
           /usr/local/bin/cfn-signal --exit-code $? --stack ${AWS::StackName} --resource EC2 --region ${AWS::Region}
