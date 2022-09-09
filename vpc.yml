@@ -35,19 +35,6 @@ Resources:
           Value: main-nacl
       VpcId: !Ref VPC
 
-  InboundSSHACL:
-    Type: AWS::EC2::NetworkAclEntry
-    Properties:
-      CidrBlock: 0.0.0.0/0
-      Egress: false
-      NetworkAclId: !Ref NetworkAcl
-      PortRange:
-        From: 22
-        To: 22
-      Protocol: 6
-      RuleAction: allow
-      RuleNumber: 100
-
   InboundHTTPACL:
     Type: AWS::EC2::NetworkAclEntry
     Properties:
@@ -152,20 +139,6 @@ Resources:
       RuleAction: allow
       RuleNumber: 140
 
-  SSHSG:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Allow SSH Traffic
-      SecurityGroupIngress:
-        - CidrIp: 0.0.0.0/0
-          FromPort: 22
-          IpProtocol: tcp
-          ToPort: 22
-      Tags:
-        - Key: Name
-          Value: SSHSG
-      VpcId: !Ref VPC
-
   WebSG:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -214,12 +187,6 @@ Outputs:
     Value: !Ref IGW
     Export:
       Name: main-igw
-
-  SSHSG:
-    Description: SSH security group
-    Value: !Ref SSHSG
-    Export:
-      Name: main-sshsg
 
   WebSG:
     Description: Web security group
