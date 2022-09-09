@@ -110,11 +110,19 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash
 
+          # Setup tailscale
+          curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.noarmor.gpg --output /usr/share/keyrings/tailscale-archive-keyring.gpg
+          curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.tailscale-keyring.list --output /etc/apt/sources.list.d/tailscale.list
+
           apt update
-          apt install -y --no-install-recommends python3-pip awscli docker.io docker-compose
-          python3 -m pip install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
-          /usr/local/bin/cfn-init -v --stack ${AWS::StackName} --resource EC2 --configsets all --region ${AWS::Region}
-          /usr/local/bin/cfn-signal --exit-code $? --stack ${AWS::StackName} --resource EC2 --region ${AWS::Region}
+          apt install -y --no-install-recommends python3-venv awscli docker-compose docker.io tailscale
+
+          # Setup cfn bootstraping metadata
+          python3 -m venv /opt/venv
+          /opt/venv/bin/python -m pip install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz requests
+          cp -r /opt/venv/lib/python3.10/site-packages/requests/* /opt/venv/lib/python3.10/site-packages/cfnbootstrap/packages/requests/.
+          /opt/venv/bin/cfn-init -v --stack ${AWS::StackName} --resource EC2 --configsets all --region ${AWS::Region}
+          /opt/venv/bin/cfn-signal --exit-code $? --stack ${AWS::StackName} --resource EC2 --region ${AWS::Region}
 
   StorageAccessPolicy:
     Type: AWS::IAM::Policy
@@ -127,8 +135,28 @@ Resources:
             Action:
               - s3:*
             Resource:
-              - !Sub '${Storage.Arn}/*'
-              - !GetAtt Storage.Arn
+              - !Sub
+                - '${BucketArn}/*'
+                - BucketArn: !ImportValue minecraft-storage-arn
+              - !ImportValue minecraft-storage-arn
+      Roles:
+        - !Ref StorageRole
+
+  SessionManagerPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: SessionManager
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - ssm:UpdateInstanceInformation
+              - ssmmessages:CreateControlChannel
+              - ssmmessages:CreateDataChannel
+              - ssmmessages:OpenControlChannel
+              - ssmmessages:OpenDataChannel
+            Resource: '*'
       Roles:
         - !Ref StorageRole
 
