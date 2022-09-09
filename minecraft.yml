@@ -154,19 +154,3 @@ Resources:
     Properties:
       Roles:
         - !Ref StorageRole
-
-  Storage:
-    Type: AWS::S3::Bucket
-    Properties:
-      AccessControl: Private
-      PublicAccessBlockConfiguration:
-        RestrictPublicBuckets: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        BlockPublicAcls: true
-      BucketName: sudoservers-minecraft
-      VersioningConfiguration:
-        Status: Enabled
-      Tags:
-        - Key: Name
-          Value: minecraft-storage
