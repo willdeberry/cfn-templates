@@ -110,6 +110,14 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash
 
+          # Setup swapfile
+          fallocate -l 2G /swapfile
+          dd if=/dev/zero of=/swapfile bs=1024 count=2097152
+          chmod 600 /swapfile
+          mkswap /swapfile
+          swapon /swapfile
+          echo '/swapfile swap swap defaults 0 0' >> /etc/fstab
+
           # Setup tailscale
           curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.noarmor.gpg --output /usr/share/keyrings/tailscale-archive-keyring.gpg
           curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.tailscale-keyring.list --output /etc/apt/sources.list.d/tailscale.list
