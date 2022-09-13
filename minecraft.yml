@@ -93,8 +93,9 @@ Resources:
           Ebs:
             DeleteOnTermination: true
             Encrypted: false
+            Iops: 3000
             VolumeSize: 20
-            VolumeType: gp2
+            VolumeType: gp3
       IamInstanceProfile: !Ref StoragePermInstanceProfile
       ImageId: !Ref UbuntuArmAMI
       InstanceType: t4g.medium
