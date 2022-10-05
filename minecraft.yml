@@ -101,6 +101,7 @@ Resources:
       InstanceType: t4g.medium
       KeyName: ssh-ed25519
       SecurityGroupIds:
+        - !ImportValue main-sshsg
         - !ImportValue main-minecraftsg
       SubnetId: !Ref Subnet
       Tags:
