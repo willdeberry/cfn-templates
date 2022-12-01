@@ -1,37 +1,52 @@
 ---
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Template for standing up minecraft server
+Description: Template for standing up SudoBot
 
 Parameters:
+  EIPAllocationId:
+    Type: String
+
+  IGWId:
+    Type: String
+
+  NACLId:
+    Type: String
+
+  SecurityGroupId:
+    Type: String
+
   UbuntuArmAMI:
     Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
     Default: /aws/service/canonical/ubuntu/server-minimal/22.04/stable/current/arm64/hvm/ebs-gp2/ami-id
+
+  VPCId:
+    Type: String
 
 Resources:
   Subnet:
     Type: AWS::EC2::Subnet
     Properties:
       AvailabilityZone: us-east-1c
-      CidrBlock: 10.0.0.16/28
-      MapPublicIpOnLaunch: true
+      CidrBlock: 10.0.0.0/28
+      MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: Minecraft
-      VpcId: !ImportValue main-vpc-id
+          Value: SudoBot
+      VpcId: !Ref VPCId
 
   RouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
       Tags:
         - Key: Name
-          Value: minecraft-routeTable
-      VpcId: !ImportValue main-vpc-id
+          Value: sudobot-routeTable
+      VpcId: !Ref VPCId
 
   Route:
     Type: AWS::EC2::Route
     Properties:
       DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !ImportValue main-igw
+      GatewayId: !Ref IGWId
       RouteTableId: !Ref RouteTable
 
   SubnetRouteTableAssociation:
@@ -43,20 +58,57 @@ Resources:
   SubnetToNACL:
     Type: AWS::EC2::SubnetNetworkAclAssociation
     Properties:
-      NetworkAclId: !ImportValue main-nacl
+      NetworkAclId: !Ref NACLId
       SubnetId: !Ref Subnet
 
   EIPAssociation:
     Type: AWS::EC2::EIPAssociation
     Properties:
-      AllocationId: !ImportValue minecraft-eip-allocationid
+      AllocationId: !Ref EIPAllocationId
       InstanceId: !Ref EC2
+
+  SessionManagerPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: SessionManager
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - ssm:UpdateInstanceInformation
+              - ssmmessages:CreateControlChannel
+              - ssmmessages:CreateDataChannel
+              - ssmmessages:OpenControlChannel
+              - ssmmessages:OpenDataChannel
+            Resource: '*'
+      Roles:
+        - !Ref SessionManagerRole
+
+  SessionManagerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Tags:
+        - Key: Name
+          Value: sudobot-session-manager
+
+  SudobotInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref SessionManagerRole
 
   EC2:
     Type: AWS::EC2::Instance
-    CreationPolicy:
-      ResourceSignal:
-        Timeout: PT5M
     Metadata:
       AWS::CloudFormation::Init:
         configSets:
@@ -94,27 +146,26 @@ Resources:
             DeleteOnTermination: true
             Encrypted: false
             Iops: 3000
-            VolumeSize: 20
+            VolumeSize: 8
             VolumeType: gp3
-      IamInstanceProfile: !Ref StoragePermInstanceProfile
+      IamInstanceProfile: !Ref SudobotInstanceProfile
       ImageId: !Ref UbuntuArmAMI
-      InstanceType: t4g.medium
+      InstanceType: t4g.nano
       KeyName: ssh-ed25519
       SecurityGroupIds:
-        - !ImportValue main-sshsg
-        - !ImportValue main-minecraftsg
+        - !Ref SecurityGroupId
       SubnetId: !Ref Subnet
       Tags:
         - Key: Name
-          Value: Minecraft
+          Value: SudoBot
       Tenancy: default
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
 
           # Setup swapfile
-          fallocate -l 2G /swapfile
-          dd if=/dev/zero of=/swapfile bs=1024 count=2097152
+          fallocate -l 1G /swapfile
+          dd if=/dev/zero of=/swapfile bs=1024 count=1048576
           chmod 600 /swapfile
           mkswap /swapfile
           swapon /swapfile
@@ -125,7 +176,7 @@ Resources:
           curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.tailscale-keyring.list --output /etc/apt/sources.list.d/tailscale.list
 
           apt update
-          apt install -y --no-install-recommends python3-venv awscli docker-compose docker.io tailscale
+          apt install -y --no-install-recommends python3-venv docker-compose docker.io tailscale
 
           # Setup cfn bootstraping metadata
           python3 -m venv /opt/venv
@@ -133,61 +184,3 @@ Resources:
           cp -r /opt/venv/lib/python3.10/site-packages/requests/* /opt/venv/lib/python3.10/site-packages/cfnbootstrap/packages/requests/.
           /opt/venv/bin/cfn-init -v --stack ${AWS::StackName} --resource EC2 --configsets all --region ${AWS::Region}
           /opt/venv/bin/cfn-signal --exit-code $? --stack ${AWS::StackName} --resource EC2 --region ${AWS::Region}
-
-  StorageAccessPolicy:
-    Type: AWS::IAM::Policy
-    Properties:
-      PolicyName: S3Admin
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Action:
-              - s3:*
-            Resource:
-              - !Sub
-                - '${BucketArn}/*'
-                - BucketArn: !ImportValue minecraft-storage-arn
-              - !ImportValue minecraft-storage-arn
-      Roles:
-        - !Ref StorageRole
-
-  SessionManagerPolicy:
-    Type: AWS::IAM::Policy
-    Properties:
-      PolicyName: SessionManager
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Action:
-              - ssm:UpdateInstanceInformation
-              - ssmmessages:CreateControlChannel
-              - ssmmessages:CreateDataChannel
-              - ssmmessages:OpenControlChannel
-              - ssmmessages:OpenDataChannel
-            Resource: '*'
-      Roles:
-        - !Ref StorageRole
-
-  StorageRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                ec2.amazonaws.com
-            Action:
-              - sts:AssumeRole
-      Tags:
-        - Key: Name
-          Value: minecraft-s3-fullAccess
-
-  StoragePermInstanceProfile:
-    Type: AWS::IAM::InstanceProfile
-    Properties:
-      Roles:
-        - !Ref StorageRole

@@ -23,5 +23,3 @@ Resources:
 Outputs:
   StorageArn:
     Value: !GetAtt Storage.Arn
-    Export:
-      Name: minecraft-storage-arn

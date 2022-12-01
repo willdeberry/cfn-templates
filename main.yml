@@ -1,0 +1,30 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Entry point for all stacks
+
+Resources:
+  VPC:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./vpc.yml
+
+  Minecraft:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./minecraft/main.yml
+      Parameters:
+        IGWId: !GetAtt VPC.Outputs.IGW
+        MinecraftSG: !GetAtt VPC.Outputs.MinecraftSG
+        NACLId: !GetAtt VPC.Outputs.NACL
+        SSHSG: !GetAtt VPC.Outputs.SSHSG
+        VPCId: !GetAtt VPC.Outputs.VPC
+
+  SudoBot:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./sudobot/main.yml
+      Parameters:
+        IGWId: !GetAtt VPC.Outputs.IGW
+        NACLId: !GetAtt VPC.Outputs.NACL
+        VPCId: !GetAtt VPC.Outputs.VPC
+        SecurityGroupId: !GetAtt VPC.Outputs.WebSG

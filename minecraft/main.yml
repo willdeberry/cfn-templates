@@ -1,0 +1,43 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Entry point for building/deploying minecraft
+
+Parameters:
+  IGWId:
+    Type: String
+
+  MinecraftSG:
+    Type: String
+
+  NACLId:
+    Type: String
+
+  SSHSG:
+    Type: String
+
+  VPCId:
+    Type: String
+
+Resources:
+  EIP:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./eip.yml
+
+  Bucket:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./s3.yml
+
+  Instance:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./instance.yml
+      Parameters:
+        BucketARN: !GetAtt Bucket.Outputs.StorageArn
+        EIPAllocationId: !GetAtt EIP.Outputs.EIPAllocationId
+        IGWId: !Ref IGWId
+        MinecraftSG: !Ref MinecraftSG
+        NACLId: !Ref NACLId
+        SSHSG: !Ref SSHSG
+        VPCId: !Ref VPCId

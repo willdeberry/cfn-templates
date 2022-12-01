@@ -206,35 +206,23 @@ Outputs:
   VPC:
     Description: VPC Id
     Value: !Ref VPC
-    Export:
-      Name: main-vpc-id
 
   IGW:
     Description: Main IGW for internet access
     Value: !Ref IGW
-    Export:
-      Name: main-igw
 
   SSHSG:
     Description: SSH security group
     Value: !Ref SSHSG
-    Export:
-      Name: main-sshsg
 
   WebSG:
     Description: Web security group
     Value: !Ref WebSG
-    Export:
-      Name: main-websg
 
   MinecraftSG:
     Description: Minecraft security group
     Value: !Ref MinecraftSG
-    Export:
-      Name: main-minecraftsg
 
   NACL:
     Description: Network ACL for all subnets
     Value: !Ref NetworkAcl
-    Export:
-      Name: main-nacl
