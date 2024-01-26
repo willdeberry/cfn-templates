@@ -74,19 +74,6 @@ Resources:
       RuleAction: allow
       RuleNumber: 102
 
-  InboundMinecraft1ACL:
-    Type: AWS::EC2::NetworkAclEntry
-    Properties:
-      CidrBlock: 0.0.0.0/0
-      Egress: false
-      NetworkAclId: !Ref NetworkAcl
-      PortRange:
-        From: 25565
-        To: 25576
-      Protocol: 6
-      RuleAction: allow
-      RuleNumber: 103
-
   InboundRepliesACL:
     Type: AWS::EC2::NetworkAclEntry
     Properties:
@@ -184,24 +171,6 @@ Resources:
           Value: WebSG
       VpcId: !Ref VPC
 
-  MinecraftSG:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Allow minecraft traffic
-      SecurityGroupIngress:
-        - CidrIp: 0.0.0.0/0
-          FromPort: 25565
-          IpProtocol: tcp
-          ToPort: 25566
-        - CidrIp: 0.0.0.0/0
-          FromPort: 25575
-          IpProtocol: tcp
-          ToPort: 25576
-      Tags:
-        - Key: Name
-          Value: MinecraftSG
-      VpcId: !Ref VPC
-
 Outputs:
   VPC:
     Description: VPC Id
@@ -218,10 +187,6 @@ Outputs:
   WebSG:
     Description: Web security group
     Value: !Ref WebSG
-
-  MinecraftSG:
-    Description: Minecraft security group
-    Value: !Ref MinecraftSG
 
   NACL:
     Description: Network ACL for all subnets
