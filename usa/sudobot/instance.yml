@@ -81,6 +81,7 @@ Resources:
               - ssmmessages:CreateDataChannel
               - ssmmessages:OpenControlChannel
               - ssmmessages:OpenDataChannel
+              - secretsmanager:GetSecretValue
             Resource: '*'
       Roles:
         - !Ref SessionManagerRole
@@ -176,7 +177,10 @@ Resources:
           curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.tailscale-keyring.list --output /etc/apt/sources.list.d/tailscale.list
 
           apt update
-          apt install -y --no-install-recommends python3-venv docker-compose docker.io tailscale
+          apt install -y --no-install-recommends python3-venv docker-compose docker.io tailscale less jq
+          snap install aws-cli --classic
+
+          tailscale up --auth-key $(aws secretsmanager get-secret-value --secret-id tailscale_auth --query SecretString --output text | jq -r .tailscale) --hostname brazilVPN --advertise-exit-node
 
           # Setup cfn bootstraping metadata
           python3 -m venv /opt/venv

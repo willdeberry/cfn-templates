@@ -6,14 +6,13 @@ Resources:
   VPC:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: ./usa/vpc.yml
+      TemplateURL: ./brazil/vpc.yml
 
-  SudoBot:
+  BrazilVPN:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: ./usa/sudobot/main.yml
+      TemplateURL: ./brazil/main.yml
       Parameters:
         IGWId: !GetAtt VPC.Outputs.IGW
         NACLId: !GetAtt VPC.Outputs.NACL
         VPCId: !GetAtt VPC.Outputs.VPC
-        SecurityGroupId: !GetAtt VPC.Outputs.WebSG

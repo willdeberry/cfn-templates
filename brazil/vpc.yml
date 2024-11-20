@@ -1,0 +1,72 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Template for basic EC2 setup
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/24
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: main
+
+  IGW:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: main-igw
+
+  VPCtoIGW:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref IGW
+      VpcId: !Ref VPC
+
+  NetworkAcl:
+    Type: AWS::EC2::NetworkAcl
+    Properties:
+      Tags:
+        - Key: Name
+          Value: main-nacl
+      VpcId: !Ref VPC
+
+  InboundRepliesACL:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Egress: false
+      NetworkAclId: !Ref NetworkAcl
+      PortRange:
+        From: 1024
+        To: 65535
+      Protocol: 6
+      RuleAction: allow
+      RuleNumber: 190
+
+  OutbountRepliesACL:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Egress: true
+      NetworkAclId: !Ref NetworkAcl
+      Protocol: -1
+      RuleAction: allow
+      RuleNumber: 190
+
+Outputs:
+  VPC:
+    Description: VPC Id
+    Value: !Ref VPC
+
+  IGW:
+    Description: Main IGW for internet access
+    Value: !Ref IGW
+
+  NACL:
+    Description: Network ACL for all subnets
+    Value: !Ref NetworkAcl

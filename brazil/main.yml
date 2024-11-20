@@ -1,0 +1,29 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Entry point for building/deploying brazil VPN machine
+
+Parameters:
+  IGWId:
+    Type: String
+
+  NACLId:
+    Type: String
+
+  VPCId:
+    Type: String
+
+Resources:
+  EIP:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./eip.yml
+
+  Instance:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./instance.yml
+      Parameters:
+        EIPAllocationId: !GetAtt EIP.Outputs.EIPAllocationId
+        VPCId: !Ref VPCId
+        IGWId: !Ref IGWId
+        NACLId: !Ref NACLId

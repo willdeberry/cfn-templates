@@ -1,0 +1,185 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Template for standing up brazil VPN
+
+Parameters:
+  EIPAllocationId:
+    Type: String
+
+  IGWId:
+    Type: String
+
+  NACLId:
+    Type: String
+
+  UbuntuArmAMI:
+    Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+    Default: /aws/service/canonical/ubuntu/server-minimal/22.04/stable/current/arm64/hvm/ebs-gp2/ami-id
+
+  VPCId:
+    Type: String
+
+Resources:
+  Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: sa-east-1c
+      CidrBlock: 10.0.0.0/28
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: Brazil
+      VpcId: !Ref VPCId
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: brazil-routeTable
+      VpcId: !Ref VPCId
+
+  Route:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref IGWId
+      RouteTableId: !Ref RouteTable
+
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref Subnet
+
+  SubnetToNACL:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref NACLId
+      SubnetId: !Ref Subnet
+
+  EIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId: !Ref EIPAllocationId
+      InstanceId: !Ref EC2
+
+  SessionManagerPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: SessionManager
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - ssm:UpdateInstanceInformation
+              - ssmmessages:CreateControlChannel
+              - ssmmessages:CreateDataChannel
+              - ssmmessages:OpenControlChannel
+              - ssmmessages:OpenDataChannel
+              - secretsmanager:GetSecretValue
+            Resource: '*'
+      Roles:
+        - !Ref SessionManagerRole
+
+  SessionManagerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Tags:
+        - Key: Name
+          Value: brazil-session-manager
+
+  BrazilInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref SessionManagerRole
+
+  EC2:
+    Type: AWS::EC2::Instance
+    Metadata:
+      AWS::CloudFormation::Init:
+        configSets:
+          all:
+            - setup
+            - config
+            - cleanup
+        setup:
+          commands:
+            createUser:
+              command: useradd --shell /bin/bash --home-dir /home/will will
+            updateGroups:
+              command: usermod -a -G docker,plugdev,sudo will
+        config:
+          files:
+            /etc/sudoers.d/will:
+              content: '%will ALL=(ALL:ALL) NOPASSWD: ALL'
+              mode: 440
+              owner: root
+              group: root
+            /home/will/.ssh/authorized_keys:
+              content: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIANk7ASLutRd1SH/+INoodEm1l07Baj16cQBYtajr6p1'
+              mode: 600
+              owner: will
+              group: will
+        cleanup:
+          commands:
+            fixPerms:
+              command: 'chown -R will.will /home/will'
+    Properties:
+      AvailabilityZone: !GetAtt Subnet.AvailabilityZone
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            DeleteOnTermination: true
+            Encrypted: false
+            Iops: 3000
+            VolumeSize: 8
+            VolumeType: gp3
+      IamInstanceProfile: !Ref BrazilInstanceProfile
+      ImageId: !Ref UbuntuArmAMI
+      InstanceType: t4g.nano
+      KeyName: ssh-ed25519
+      SubnetId: !Ref Subnet
+      Tags:
+        - Key: Name
+          Value: Brazil
+      Tenancy: default
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+
+          # Setup swapfile
+          fallocate -l 1G /swapfile
+          dd if=/dev/zero of=/swapfile bs=1024 count=1048576
+          chmod 600 /swapfile
+          mkswap /swapfile
+          swapon /swapfile
+          echo '/swapfile swap swap defaults 0 0' >> /etc/fstab
+
+          # Setup tailscale
+          curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.noarmor.gpg --output /usr/share/keyrings/tailscale-archive-keyring.gpg
+          curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.tailscale-keyring.list --output /etc/apt/sources.list.d/tailscale.list
+
+          apt update
+          apt install -y --no-install-recommends python3-venv docker-compose docker.io tailscale less jq
+          snap install aws-cli --classic
+
+          tailscale up --auth-key $(aws secretsmanager get-secret-value --secret-id tailscale_auth --query SecretString --output text | jq -r .tailscale) --hostname brazilVPN --advertise-exit-node
+
+          # Setup cfn bootstraping metadata
+          python3 -m venv /opt/venv
+          /opt/venv/bin/python -m pip install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz requests
+          cp -r /opt/venv/lib/python3.10/site-packages/requests/* /opt/venv/lib/python3.10/site-packages/cfnbootstrap/packages/requests/.
+          /opt/venv/bin/cfn-init -v --stack ${AWS::StackName} --resource EC2 --configsets all --region ${AWS::Region}
+          /opt/venv/bin/cfn-signal --exit-code $? --stack ${AWS::StackName} --resource EC2 --region ${AWS::Region}
